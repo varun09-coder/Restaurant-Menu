@@ -1,0 +1,188 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+def restaurant_menu_recommender(menu, calorie_limit):
+    """
+    Recommends dishes from a menu that fit within a calorie limit
+    while maximizing the total taste rating using the 0/1 Knapsack algorithm.
+    (Same logic as the previous code)
+    """
+    n = len(menu)
+    dp = [[0 for _ in range(calorie_limit + 1)] for _ in range(n + 1)]
+    keep = [[False for _ in range(calorie_limit + 1)] for _ in range(n + 1)]
+
+    for i in range(1, n + 1):
+        name = menu[i - 1]['name']
+        calories = menu[i - 1]['calories']
+        taste = menu[i - 1]['taste_rating']
+        for w in range(calorie_limit + 1):
+            if calories <= w:
+                value_if_included = taste + dp[i - 1][w - calories]
+                value_if_excluded = dp[i - 1][w]
+                if value_if_included > value_if_excluded:
+                    dp[i][w] = value_if_included
+                    keep[i][w] = True
+                else:
+                    dp[i][w] = value_if_excluded
+                    keep[i][w] = False
+            else:
+                dp[i][w] = dp[i - 1][w]
+                keep[i][w] = False
+
+    total_taste = dp[n][calorie_limit]
+    recommended_dishes = []
+    w = calorie_limit
+    for i in range(n, 0, -1):
+        if keep[i][w]:
+            recommended_dishes.append(menu[i - 1]['name'])
+            w -= menu[i - 1]['calories']
+
+    return total_taste, recommended_dishes[::-1]
+
+class MenuRecommenderGUI:
+    def __init__(self, master):
+        self.master = master
+        master.title("Restaurant Menu Recommender")
+
+        # --- Improved Color Theme ---
+        self.primary_color = "#f0f8ff"  # Alice Blue (light and airy)
+        self.secondary_color = "#add8e6"  # Light Blue
+        self.accent_color = "#4682b4"  # Steel Blue (for buttons/highlights)
+        self.text_color = "#333333"  # Dark gray for text
+        self.highlight_color = "#e0ffff" # Light Cyan for selection
+
+        master.config(bg=self.primary_color)
+
+        self.style = ttk.Style(master)
+        self.configure_styles()
+
+        self.menu_items = []  # List to store menu items
+        self.create_widgets()
+
+    def configure_styles(self):
+        self.style.theme_use('clam')  # A decent built-in theme
+
+        self.style.configure("TLabel", background=self.primary_color, foreground=self.text_color, padding=5, font=("Arial", 10))
+        self.style.configure("TButton", background=self.accent_color, foreground="white", padding=8, font=("Arial", 10, "bold"))
+        self.style.map("TButton",
+                       background=[("active", "#6495ed")],  # Slightly darker on hover
+                       foreground=[("active", "white")])
+        self.style.configure("TEntry", padding=5, font=("Arial", 10))
+        self.style.configure("TListbox", background="white", foreground=self.text_color, font=("Arial", 10), selectbackground=self.highlight_color, selectforeground=self.text_color)
+
+    def create_widgets(self):
+        # --- Menu Input Section ---
+        ttk.Label(self.master, text="Add Menu Item:", font=("Arial", 12, "bold"), background=self.primary_color, foreground=self.accent_color).grid(row=0, column=0, columnspan=3, pady=10)
+
+        ttk.Label(self.master, text="Name:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        self.name_entry = ttk.Entry(self.master, width=20)
+        self.name_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        ttk.Label(self.master, text="Calories:").grid(row=2, column=0, padx=5, pady=5, sticky="w")
+        self.calories_entry = ttk.Entry(self.master, width=10)
+        self.calories_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        ttk.Label(self.master, text="Taste Rating:").grid(row=3, column=0, padx=5, pady=5, sticky="w")
+        self.taste_entry = ttk.Entry(self.master, width=10)
+        self.taste_entry.grid(row=3, column=1, padx=5, pady=5)
+
+        add_button = ttk.Button(self.master, text="Add Item to Menu", command=self.add_item)
+        add_button.grid(row=4, column=0, columnspan=2, pady=10)
+
+        # --- Current Menu Display ---
+        ttk.Label(self.master, text="Current Menu:", font=("Arial", 12, "bold"), background=self.primary_color, foreground=self.accent_color).grid(row=5, column=0, columnspan=3, pady=10)
+        self.menu_list_var = tk.StringVar(value=[])
+        self.menu_listbox = tk.Listbox(self.master, listvariable=self.menu_list_var, width=40, height=5)
+        self.menu_listbox.grid(row=6, column=0, columnspan=3, padx=10, pady=5)
+
+        remove_button = ttk.Button(self.master, text="Remove Selected Item", command=self.remove_item)
+        remove_button.grid(row=7, column=0, columnspan=2, pady=5)
+
+        # --- Calorie Limit Input ---
+        ttk.Label(self.master, text="Calorie Limit:", font=("Arial", 12, "bold"), background=self.primary_color, foreground=self.accent_color).grid(row=8, column=0, columnspan=3, pady=10)
+        ttk.Label(self.master, text="Enter Limit:").grid(row=9, column=0, padx=5, pady=5, sticky="w")
+        self.calorie_limit_entry = ttk.Entry(self.master, width=15)
+        self.calorie_limit_entry.grid(row=9, column=1, padx=5, pady=5)
+
+        recommend_button = ttk.Button(self.master, text="Get Recommendations", command=self.get_recommendations)
+        recommend_button.grid(row=10, column=0, columnspan=2, pady=10)
+
+        # --- Recommendation Output ---
+        ttk.Label(self.master, text="Recommendations:", font=("Arial", 12, "bold"), background=self.primary_color, foreground=self.accent_color).grid(row=11, column=0, columnspan=3, pady=10)
+        self.recommendation_label = ttk.Label(self.master, text="")
+        self.recommendation_label.grid(row=12, column=0, columnspan=3, padx=10, pady=5, sticky="w")
+
+        self.recommended_dishes_var = tk.StringVar(value=[])
+        self.recommended_dishes_listbox = tk.Listbox(self.master, listvariable=self.recommended_dishes_var, width=40, height=5)
+        self.recommended_dishes_listbox.grid(row=13, column=0, columnspan=3, padx=10, pady=5)
+
+        ttk.Label(self.master, text="Total Taste Rating:", font=("Arial", 10, "italic"), background=self.primary_color, foreground=self.text_color).grid(row=14, column=0, sticky="w", padx=10, pady=5)
+        self.total_taste_label = ttk.Label(self.master, text="", background=self.primary_color, foreground=self.accent_color, font=("Arial", 10, "bold"))
+        self.total_taste_label.grid(row=14, column=1, sticky="w", pady=5)
+
+    def add_item(self):
+        name = self.name_entry.get().strip()
+        calories_str = self.calories_entry.get().strip()
+        taste_str = self.taste_entry.get().strip()
+
+        if not name or not calories_str or not taste_str:
+            messagebox.showerror("Error", "Please fill in all the item details.")
+            return
+
+        try:
+            calories = int(calories_str)
+            taste = int(taste_str)
+            if calories < 0 or taste < 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "Calories and Taste Rating must be non-negative integers.")
+            return
+
+        item = {'name': name, 'calories': calories, 'taste_rating': taste}
+        self.menu_items.append(item)
+        self.update_menu_listbox()
+        self.name_entry.delete(0, tk.END)
+        self.calories_entry.delete(0, tk.END)
+        self.taste_entry.delete(0, tk.END)
+
+    def remove_item(self):
+        selected_index = self.menu_listbox.curselection()
+        if selected_index:
+            del self.menu_items[selected_index[0]]
+            self.update_menu_listbox()
+
+    def update_menu_listbox(self):
+        display_list = [f"{item['name']} (Calories: {item['calories']}, Taste: {item['taste_rating']})" for item in self.menu_items]
+        self.menu_list_var.set(display_list)
+
+    def get_recommendations(self):
+        calorie_limit_str = self.calorie_limit_entry.get().strip()
+        if not calorie_limit_str:
+            messagebox.showerror("Error", "Please enter a calorie limit.")
+            return
+
+        try:
+            calorie_limit = int(calorie_limit_str)
+            if calorie_limit < 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Error", "Calorie Limit must be a non-negative integer.")
+            return
+
+        if not self.menu_items:
+            messagebox.showinfo("Info", "Please add items to the menu first.")
+            return
+
+        max_taste, recommended_dishes = restaurant_menu_recommender(self.menu_items, calorie_limit)
+
+        self.total_taste_label.config(text=str(max_taste))
+        self.recommended_dishes_var.set(recommended_dishes)
+        if recommended_dishes:
+            self.recommendation_label.config(text="Recommended dishes:")
+        else:
+            self.recommendation_label.config(text="No dishes recommended within the calorie limit.")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    gui = MenuRecommenderGUI(root)
+    root.mainloop()
